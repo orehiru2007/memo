@@ -1,0 +1,207 @@
+chang.ddo.jp / CentOS Linux release 8.3.2011 / Oracle VirtualBox
+
+1. フォルダ作成
+
+   1. ルート証明書用
+   # mkdir -p /etc/pki/chang.ddo.jp/RootCA/{certs,crl,newcerts,private}
+   # touch /etc/pki/chang.ddo.jp/RootCA/{index.txt,index.txt.attr}
+   # bash -c "echo '01' > /etc/pki/chang.ddo.jp/RootCA/serial"
+   # bash -c "echo '01' > /etc/pki/chang.ddo.jp/RootCA/crlnumber"
+
+   2. エンドエンティティ用
+   # mkdir -p /etc/pki/chang.ddo.jp/EndEntity
+   # mkdir -p /etc/pki/chang.ddo.jp/EndEntity/{certs,newcerts,private}
+   # touch /etc/pki/chang.ddo.jp/EndEntity/{index.txt,index.txt.attr}
+   # bash -c "echo '01' > /etc/pki/chang.ddo.jp/EndEntity/serial"
+   # bash -c "echo '01' > /etc/pki/chang.ddo.jp/EndEntity/crlnumber"
+
+   3. ユーザー認証用
+   # mkdir -p /etc/pki/chang.ddo.jp/Client
+   # mkdir -p /etc/pki/chang.ddo.jp/Client/{certs,newcerts,private}
+   # touch /etc/pki/chang.ddo.jp/Client/{index.txt,index.txt.attr}
+   # bash -c "echo '01' > /etc/pki/chang.ddo.jp/Client/serial"
+   # bash -c "echo '01' > /etc/pki/chang.ddo.jp/Client/crlnumber"
+
+2. RootCA 用 openssl.cnf 設定ファイルのコピーと編集
+
+   # cp -Rp /etc/pki/tls/openssl.cnf /etc/pki/chang.ddo.jp/openssl-RootCA.cnf
+
+   # diff -U0 /etc/pki/tls/openssl.cnf /etc/pki/chang.ddo.jp/openssl-RootCA.cnf
+   --- /etc/pki/tls/openssl.cnf    2021-03-30 23:29:24.000000000 +0900
+   +++ /etc/pki/chang.ddo.jp/openssl-RootCA.cnf    2021-06-01 20:39:49.599545327 +0900
+   @@ -61 +61 @@
+   -dir            = /etc/pki/CA           # Where everything is kept
+   +dir            = /etc/pki/chang.ddo.jp/RootCA          # Where everything is kept
+   @@ -65 +65 @@
+   -#unique_subject        = no                    # Set to 'no' to allow creation of
+   +unique_subject = no                    # Set to 'no' to allow creation of
+   @@ -91,2 +91,2 @@
+   -default_days   = 365                   # how long to certify for
+   -default_crl_days= 30                   # how long before next CRL
+   +default_days   = 10957                 # how long to certify for
+   +default_crl_days= 10957                        # how long before next CRL
+   @@ -124 +124 @@
+   -default_bits           = 2048
+   +default_bits           = 4096
+   @@ -261 +261 @@
+   -# keyUsage = cRLSign, keyCertSign
+   +keyUsage = critical, cRLSign, keyCertSign
+
+3. ルート証明書の発行と自己署名
+
+   # cd /etc/pki/chang.ddo.jp/RootCA
+   # touch private/PKI_Root_CA.pass
+   # chmod 640 private/PKI_Root_CA.pass
+
+   1. 難読パスワードを作成
+   # dd if=/dev/urandom bs=32 count=1 2>/dev/null | base64 > private/PKI_Root_CA.pass
+
+   2. 秘密鍵と公開鍵一括発行と自己署名
+   # openssl req -verbose -config /etc/pki/chang.ddo.jp/openssl-RootCA.cnf -batch -x509 -subj \
+   > "/C=JP/O=TAK CO.,LTD./CN=Private PKI Administrator CA" \
+   > -days 10957 -passout file:private/PKI_Root_CA.pass -keyout private/PKI_Root_CA.key -out certs/PKI_Root_CA.crt
+ 
+   3. 公開鍵、秘密鍵の確認 (両方が一致すること)
+   # openssl x509 -in certs/PKI_Root_CA.crt -noout -modulus
+   # openssl rsa -in private/PKI_Root_CA.key -passin file:private/PKI_Root_CA.pass -noout -modulus
+
+   4. CRL 作成
+   # openssl ca -config /etc/pki/chang.ddo.jp/openssl-RootCA.cnf -gencrl -crldays 10957 \
+   > -cert /etc/pki/chang.ddo.jp/RootCA/certs/PKI_Root_CA.crt \
+   > -keyfile /etc/pki/chang.ddo.jp/RootCA/private/PKI_Root_CA.key \
+   > -passin file:/etc/pki/chang.ddo.jp/RootCA/private/PKI_Root_CA.pass \
+   > -out /etc/pki/chang.ddo.jp/RootCA/crl/PKI_Root_CA.crl
+
+   5. 失効リスト確認
+   # openssl crl -in /etc/pki/chang.ddo.jp/RootCA/crl/PKI_Root_CA.crl -text -noout
+
+4. エンドエンティティ用 openssl.cnf 設定ファイルのコピーと編集
+
+   # cp -Rp /etc/pki/tls/openssl.cnf /etc/pki/chang.ddo.jp/openssl-EndEntity.cnf
+
+   # diff -U0 /etc/pki/tls/openssl.cnf /etc/pki/chang.ddo.jp/openssl-EndEntity.cnf
+   --- /etc/pki/tls/openssl.cnf    2021-03-30 23:29:24.000000000 +0900
+   +++ /etc/pki/chang.ddo.jp/openssl-EndEntity.cnf 2021-06-01 20:45:34.667139215 +0900
+   @@ -61 +61 @@
+   -dir            = /etc/pki/CA           # Where everything is kept
+   +dir            = /etc/pki/chang.ddo.jp/EndEntity/              # Where everything is kept
+   @@ -91,2 +91,2 @@
+   -default_days   = 365                   # how long to certify for
+   -default_crl_days= 30                   # how long before next CRL
+   +default_days   = 10957                 # how long to certify for
+   +default_crl_days= 10957                        # how long before next CRL
+   @@ -124 +124 @@
+   -default_bits           = 2048
+   +default_bits           = 4096
+   @@ -190 +190,7 @@
+   -basicConstraints=CA:FALSE
+   +#basicConstraints=CA:FALSE
+   +keyUsage               = critical, digitalSignature, keyEncipherment
+   +extendedKeyUsage       = serverAuth, clientAuth
+   +crlDistributionPoints  = URI:http://chang.ddo.jp/SCA01crl.crl
+   +authorityInfoAccess    = caIssuers;URI:http://chang.ddo.jp/SCA01.crt
+   +subjectAltName         = DNS:chang.ddo.jp
+   +certificatePolicies    = 2.23.140.1.2.2
+
+5. エンドエンティティ証明書の発行と自己署名
+
+   # cd /etc/pki/chang.ddo.jp/EndEntity
+   # touch private/EndEntity.pass
+   # chmod 640 private/EndEntity.pass
+
+   1. 簡単なパスワードを作成
+   # echo -n "Taknet77" > private/EndEntity.pass
+
+   2. 署名要求の発行
+   # openssl req -new -verbose -config /etc/pki/chang.ddo.jp/openssl-EndEntity.cnf \
+   > -batch -subj "/C=JP/ST=Gifu/L=Ogaki/O=TAK CO.,LTD./OU=Private Server/CN=chang.ddo.jp" \
+   > -batch -passout file:private/EndEntity.pass \
+   > -keyout private/EndEntity.key -out certs/EndEntity.csr 
+
+   3. 秘密鍵のパスワードを外す
+   # cd /etc/pki/chang.ddo.jp/EndEntity/private/
+   # mv EndEntity.key EndEntity.key.orig
+   # openssl rsa -in EndEntity.key.orig -out EndEntity.key
+   Enter pass phrase for EndEntity.key.orig: Taknet77
+   writing RSA key
+
+   4. 署名
+   # cd /etc/pki/chang.ddo.jp/EndEntity
+   # openssl ca -create_serial -config /etc/pki/chang.ddo.jp/openssl-EndEntity.cnf \
+   > -batch -days 1825 -in certs/EndEntity.csr -cert ../RootCA/certs/PKI_Root_CA.crt \
+   > -passin file:../RootCA/private/PKI_Root_CA.pass \
+   > -keyfile ../RootCA/private/PKI_Root_CA.key -out certs/EndEntity.crt -policy policy_anything
+   
+   Using configuration from /etc/pki/chang.ddo.jp/openssl-EndEntity.cnf
+   Check that the request matches the signature
+   Signature ok
+   Certificate Details:
+           Serial Number: 2 (0x2)
+           Validity
+               Not Before: Jun  1 11:51:55 2021 GMT
+               Not After : May 31 11:51:55 2026 GMT
+           Subject:
+               countryName               = JP
+               stateOrProvinceName       = Gifu
+               localityName              = Ogaki
+               organizationName          = TAK CO.,LTD.
+               organizationalUnitName    = Private Server
+               commonName                = chang.ddo.jp
+           X509v3 extensions:
+               X509v3 Key Usage: critical
+                   Digital Signature, Key Encipherment
+               X509v3 Extended Key Usage:
+                   TLS Web Server Authentication, TLS Web Client Authentication
+               X509v3 CRL Distribution Points:
+   
+                   Full Name:
+                     URI:http://chang.ddo.jp/SCA01crl.crl
+   
+               Authority Information Access:
+                   CA Issuers - URI:http://chang.ddo.jp/SCA01.crt
+   
+               X509v3 Subject Alternative Name:
+                   DNS:chang.ddo.jp
+               X509v3 Certificate Policies:
+                   Policy: 2.23.140.1.2.2
+   
+               Netscape Comment:
+                   OpenSSL Generated Certificate
+               X509v3 Subject Key Identifier:
+                   50:CC:95:E0:B1:31:A4:00:31:16:B4:B6:A8:25:95:A0:23:EA:0D:1C
+               X509v3 Authority Key Identifier:
+                   keyid:DC:9A:6B:1D:58:F6:18:FA:0E:A3:C0:5E:74:62:1A:F0:F5:98:C6:5B
+   
+   Certificate is to be certified until May 31 11:51:55 2026 GMT (1825 days)
+   
+   Write out database with 1 new entries
+   Data Base Updated
+
+6. エンドエンティティ証明書を失効させる
+
+   1. 失効リスト確認
+   # openssl crl -in /etc/pki/chang.ddo.jp/RootCA/crl/PKI_Root_CA.crl -text -noout
+
+   2. 証明書を失効させる
+   # openssl ca -config /etc/pki/chang.ddo.jp/openssl-EndEntity.cnf \
+   -batch -revoke /etc/pki/chang.ddo.jp/EndEntity/certs/EndEntity.crt \
+   -cert /etc/pki/chang.ddo.jp/RootCA/certs/PKI_Root_CA.crt \
+   -keyfile /etc/pki/chang.ddo.jp/RootCA/private/PKI_Root_CA.key \
+   -passin file:/etc/pki/chang.ddo.jp/RootCA/private/PKI_Root_CA.pass
+
+   3. CRL 作成
+   # openssl ca -config /etc/pki/chang.ddo.jp/openssl-RootCA.cnf -gencrl -crldays 10957 \
+   > -cert /etc/pki/chang.ddo.jp/RootCA/certs/PKI_Root_CA.crt \
+   > -keyfile /etc/pki/chang.ddo.jp/RootCA/private/PKI_Root_CA.key \
+   > -passin file:/etc/pki/chang.ddo.jp/RootCA/private/PKI_Root_CA.pass \
+   > -out /etc/pki/chang.ddo.jp/RootCA/crl/PKI_Root_CA.crl
+
+   4. 失効リスト確認
+   # openssl crl -in /etc/pki/chang.ddo.jp/RootCA/crl/PKI_Root_CA.crl -text -noout
+
+7. 接続確認
+
+   # curl https://chang.ddo.jp --cacert /etc/pki/chang.ddo.jp/RootCA/certs/PKI_Root_CA.crt
+   testtesttettshdkjtdcfgvhjkl@poiucxfcgtuyhijokpl@;[:
+
+

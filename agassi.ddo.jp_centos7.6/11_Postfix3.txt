@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 agassi.ddo.jp CentOS Linux release 7.6.1810 (Core) / EPSON Endeavor ST11E
 
 Postfix 3 系 (コンパイルインストール)

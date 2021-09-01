@@ -1,0 +1,110 @@
+https://qiita.com/Brutus/items/d19af6b9c55de93663f6
+https://knowledge.sakura.ad.jp/2210/#:~:text=Docker%20Hub%E3%81%AF%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E3%81%8C,%E3%83%90%E3%83%BC%E3%82%B8%E3%83%A7%E3%83%B3%E7%AE%A1%E7%90%86%E3%82%82%E5%8F%AF%E8%83%BD%E3%81%A0%E3%80%82
+https://tech-lab.sios.jp/archives/23219
+https://zenn.dev/ymasaoka/articles/install-docker-centos-7
+
+1. Docker HUB アカウント
+
+   https://hub.docker.com/signup
+
+   Docker ID : orehiru2007
+   Email     : masuda@agassi.ddo.jp
+   Password  : !hirosi!!
+
+2. Docker のインストール
+
+   # yum update
+   # yum upgrade
+   # yum remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine
+
+   1. 公式リポジトリのインストール
+   # yum install -y yum-utils device-mapper-persistent-data lvm2
+   # yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+   2. DOCKER CE のインストール
+   # yum install -y docker-ce docker-ce-cli containerd.io 
+   # yum install -y docker-ce docker-ce-cli containerd.io  --allowerasing     ← 依存関係でエラーが発生する場合
+
+3. Docker の起動
+
+   # systemctl start docker
+   # systemctl enable docker
+
+   # docker --version
+   Docker version 20.10.6, build 370c289
+
+4. CentOS 7 の Docker でコンテナ型仮想化のコンテナ作成
+
+   httpd とか、Postfix とかミドルウェアでも良いが、仕事関係での展開を考慮し、CentOS で行く
+
+   1. CentOS Image のダウンロード (pull)
+
+      CentOS Image の検索 : https://hub.docker.com/search?q=&type=image&category=os
+
+      # docker search centos
+      NAME                               DESCRIPTION                                      STARS     OFFICIAL   AUTOMATED
+      centos                             The official build of CentOS.                    6533      [OK]
+      ansible/centos7-ansible            Ansible on Centos7                               134                  [OK]
+      consol/centos-xfce-vnc             Centos container with "headless" VNC session…   128                  [OK]
+      jdeathe/centos-ssh                 OpenSSH / Supervisor / EPEL/IUS/SCL Repos - …   118                  [OK]
+      centos/systemd                     systemd enabled base container.                  98                   [OK]
+      centos/mysql-57-centos7            MySQL 5.7 SQL database server                    87
+      imagine10255/centos6-lnmp-php56    centos6-lnmp-php56                               58                   [OK]
+      tutum/centos                       Simple CentOS docker image with SSH access       48
+      kinogmt/centos-ssh                 CentOS with SSH                                  29                   [OK]
+      pivotaldata/centos-gpdb-dev        CentOS image for GPDB development. Tag names…   13
+      guyton/centos6                     From official centos6 container with full up…   10                   [OK]
+      centos/tools                       Docker image that has systems administration…   7                    [OK]
+      drecom/centos-ruby                 centos ruby                                      6                    [OK]
+      pivotaldata/centos                 Base centos, freshened up a little with a Do…   5
+      pivotaldata/centos-gcc-toolchain   CentOS with a toolchain, but unaffiliated wi…   3
+      mamohr/centos-java                 Oracle Java 8 Docker image based on Centos 7     3                    [OK]
+      pivotaldata/centos-mingw           Using the mingw toolchain to cross-compile t…   3
+      darksheer/centos                   Base Centos Image -- Updated hourly              3                    [OK]
+      indigo/centos-maven                Vanilla CentOS 7 with Oracle Java Developmen…   2                    [OK]
+      amd64/centos                       The official build of CentOS.                    2
+      blacklabelops/centos               CentOS Base Image! Built and Updates Daily!      1                    [OK]
+      pivotaldata/centos6.8-dev          CentosOS 6.8 image for GPDB development          1
+      mcnaughton/centos-base             centos base image                                1                    [OK]
+      smartentry/centos                  centos with smartentry                           0                    [OK]
+      pivotaldata/centos7-dev            CentosOS 7 image for GPDB development            0
+
+      # docker pull centos
+      # docker images
+      REPOSITORY   TAG       IMAGE ID       CREATED        SIZE
+      centos       latest    300e315adb2f   4 months ago   209MB
+
+   2. コンテナの作成と起動
+
+      docker run コマンドのオプション
+      -d     : バックグラウンドでコンテナを動作させる（デタッチモード）
+      -it    : ホストとコンテナの標準入出力を接続する。コンテナのコンソールに接続する
+      -h     : ホスト名
+      -p     : ポートマッピング
+      --name : 作成するコンテナ名
+
+# docker run -d -it -e TZ=Asia/Tokyo -h costa.ddo.jp -p 9001:443 --name costa centos
+78a72fd02ab3bdd304adf31c3b9f596002712de46bf6eb16fdf1896628938e01
+
+
+docker run -d --privileged -e TZ=Asia/Tokyo -h costa.ddo.jp -p 9001:443 --name costa centos /sbin/init
+
+
+# docker ps -a
+CONTAINER ID   IMAGE     COMMAND       CREATED          STATUS          PORTS                                     NAMES
+78a72fd02ab3   centos    "/bin/bash"   20 seconds ago   Up 19 seconds   0.0.0.0:9001->443/tcp, :::9001->443/tcp   costa
+
+   3. costa コンテナへのコンソール接続
+
+      # docker exec -it costa bash
+
+
+5. コンテナの基本設定
+
+   1. 
+
+    1. 必要パッケージのインストール
+
+nkf 
+
+

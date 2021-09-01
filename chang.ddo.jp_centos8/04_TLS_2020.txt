@@ -1,0 +1,209 @@
+chang.ddo.jp / CentOS Linux release 8.3.2011 / Oracle VirtualBox
+
+1. フォルダ作成
+
+   1. ルート証明書用
+   # mkdir -p /etc/pki/takserver.work/RootCA/{certs,crl,newcerts,private}
+   # touch /etc/pki/takserver.work/RootCA/{index.txt,index.txt.attr}
+   # bash -c "echo '01' > /etc/pki/takserver.work/RootCA/serial"
+   # bash -c "echo '01' > /etc/pki/takserver.work/RootCA/crlnumber"
+
+   2. エンドエンティティ用
+   # mkdir -p /etc/pki/takserver.work/EndEntity
+   # mkdir -p /etc/pki/takserver.work/EndEntity/{certs,newcerts,private}
+   # touch /etc/pki/takserver.work/EndEntity/{index.txt,index.txt.attr}
+   # bash -c "echo '01' > /etc/pki/takserver.work/EndEntity/serial"
+   # bash -c "echo '01' > /etc/pki/takserver.work/EndEntity/crlnumber"
+
+   3. ユーザー認証用
+   # mkdir -p /etc/pki/takserver.work/Client
+   # mkdir -p /etc/pki/takserver.work/Client/{certs,newcerts,private}
+   # touch /etc/pki/takserver.work/Client/{index.txt,index.txt.attr}
+   # bash -c "echo '01' > /etc/pki/takserver.work/Client/serial"
+   # bash -c "echo '01' > /etc/pki/takserver.work/Client/crlnumber"
+
+2. RootCA 用 openssl.cnf 設定ファイルのコピーと編集
+
+   # cp -Rp /etc/pki/tls/openssl.cnf /etc/pki/takserver.work/openssl-RootCA.cnf
+
+   # diff -U0 /etc/pki/tls/openssl.cnf /etc/pki/takserver.work/openssl-RootCA.cnf
+   --- /etc/pki/tls/openssl.cnf    2021-03-30 23:29:24.000000000 +0900
+   +++ /etc/pki/takserver.work/openssl-RootCA.cnf  2021-04-22 19:03:49.096074667 +0900
+   @@ -61 +61 @@
+   -dir            = /etc/pki/CA           # Where everything is kept
+   +dir            = /etc/pki/takserver.work/RootCA        # Where everything is kept
+   @@ -65 +65 @@
+   -#unique_subject        = no                    # Set to 'no' to allow creation of
+   +unique_subject = no                    # Set to 'no' to allow creation of
+   @@ -91,2 +91,2 @@
+   -default_days   = 365                   # how long to certify for
+   -default_crl_days= 30                   # how long before next CRL
+   +default_days   = 10957                 # how long to certify for
+   +default_crl_days= 10957                        # how long before next CRL
+   @@ -124 +124 @@
+   -default_bits           = 2048
+   +default_bits           = 4096
+   @@ -261 +261 @@
+   -# keyUsage = cRLSign, keyCertSign
+   +keyUsage = critical, cRLSign, keyCertSign
+
+3. ルート証明書の発行と自己署名
+
+   # cd /etc/pki/takserver.work/RootCA
+   # touch private/PKI_Root_CA.pass
+   # chmod 640 private/PKI_Root_CA.pass
+
+   1. 難読パスワードを作成
+   # dd if=/dev/urandom bs=32 count=1 2>/dev/null | base64 > private/PKI_Root_CA.pass
+
+   2. 秘密鍵と公開鍵一括発行と自己署名
+   # openssl req -verbose -config /etc/pki/takserver.work/openssl-RootCA.cnf -batch -x509 -subj \
+   > "/C=JP/O=TAK CO.,LTD./CN=TAK Long-term Care Monitoring Private PKI Administrator CA" \
+   > -days 10957 -passout file:private/PKI_Root_CA.pass -keyout private/PKI_Root_CA.key -out certs/PKI_Root_CA.crt
+ 
+   3. 公開鍵、秘密鍵の確認 (両方が一致すること)
+   # openssl x509 -in certs/PKI_Root_CA.crt -noout -modulus
+   # openssl rsa -in private/PKI_Root_CA.key -passin file:private/PKI_Root_CA.pass -noout -modulus
+
+   4. CRL 作成
+   # openssl ca -config /etc/pki/takserver.work/openssl-RootCA.cnf -gencrl -crldays 10957 \
+   > -cert /etc/pki/takserver.work/RootCA/certs/PKI_Root_CA.crt \
+   > -keyfile /etc/pki/takserver.work/RootCA/private/PKI_Root_CA.key \
+   > -passin file:/etc/pki/takserver.work/RootCA/private/PKI_Root_CA.pass \
+   > -out /etc/pki/takserver.work/RootCA/crl/PKI_Root_CA.crl
+
+   5. 失効リスト確認
+   # openssl crl -in /etc/pki/takserver.work/RootCA/crl/PKI_Root_CA.crl -text -noout
+
+4. エンドエンティティ用 openssl.cnf 設定ファイルのコピーと編集
+
+   # cp -Rp /etc/pki/tls/openssl.cnf /etc/pki/takserver.work/openssl-EndEntity.cnf
+
+   # diff -U0 /etc/pki/tls/openssl.cnf /etc/pki/takserver.work/openssl-EndEntity.cnf
+   --- /etc/pki/tls/openssl.cnf    2021-03-30 23:29:24.000000000 +0900
+   +++ /etc/pki/takserver.work/openssl-EndEntity.cnf       2021-04-22 21:12:11.557258751 +0900
+   @@ -61 +61 @@
+   -dir            = /etc/pki/CA           # Where everything is kept
+   +dir            = /etc/pki/takserver.work/EndEntity/            # Where everything is kept
+   @@ -91,2 +91,2 @@
+   -default_days   = 365                   # how long to certify for
+   -default_crl_days= 30                   # how long before next CRL
+   +default_days   = 10957                 # how long to certify for
+   +default_crl_days= 10957                        # how long before next CRL
+   @@ -124 +124 @@
+   -default_bits           = 2048
+   +default_bits           = 4096
+   @@ -190 +190,7 @@
+   -basicConstraints=CA:FALSE
+   +#basicConstraints=CA:FALSE
+   +keyUsage               = critical, digitalSignature, keyEncipherment
+   +extendedKeyUsage       = serverAuth, clientAuth
+   +crlDistributionPoints  = URI:http://takserver.work/SCA01crl.crl
+   +authorityInfoAccess    = caIssuers;URI:http://takserver.work/SCA01.crt
+   +subjectAltName         = DNS:takserver.work
+   +certificatePolicies    = 2.23.140.1.2.2
+   @@ -242 +247,0 @@
+   -keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+
+5. エンドエンティティ証明書の発行と自己署名
+
+   # cd /etc/pki/takserver.work/EndEntity
+   # touch private/EndEntity.pass
+   # chmod 640 private/EndEntity.pass
+
+   1. 簡単なパスワードを作成
+   # echo -n "Taknet77" > private/EndEntity.pass
+
+   2. 署名要求の発行
+   # openssl req -new -verbose -config /etc/pki/takserver.work/openssl-EndEntity.cnf \
+   > -batch -subj "/C=JP/ST=Gifu/L=Ogaki/O=TAK CO.,LTD./OU=TAK Long-term Care Monitoring/CN=takserver.work" \
+   > -batch -passout file:private/EndEntity.pass \
+   > -keyout private/EndEntity.key -out certs/EndEntity.csr 
+
+   3. 秘密鍵のパスワードを外す
+   # cd /etc/pki/takserver.work/EndEntity/private/
+   # mv EndEntity.key EndEntity.key.orig
+   # openssl rsa -in EndEntity.key.orig -out EndEntity.key
+   Enter pass phrase for EndEntity.key.orig: Taknet77
+   writing RSA key
+
+   4. 署名
+   # cd /etc/pki/takserver.work/EndEntity
+   # openssl ca -create_serial -config /etc/pki/takserver.work/openssl-EndEntity.cnf \
+   > -batch -days 1825 -in certs/EndEntity.csr -cert ../RootCA/certs/PKI_Root_CA.crt \
+   > -passin file:../RootCA/private/PKI_Root_CA.pass \
+   > -keyfile ../RootCA/private/PKI_Root_CA.key -out certs/EndEntity.crt -policy policy_anything
+   
+   Using configuration from /etc/pki/takserver.work/openssl-EndEntity.cnf
+   Check that the request matches the signature
+   Signature ok
+   Certificate Details:
+           Serial Number: 1 (0x1)
+           Validity
+               Not Before: Apr 22 12:33:22 2021 GMT
+               Not After : Apr 21 12:33:22 2026 GMT
+           Subject:
+               countryName               = JP
+               stateOrProvinceName       = Gifu
+               localityName              = Ogaki
+               organizationName          = TAK CO.,LTD.
+               organizationalUnitName    = TAK Long-term Care Monitoring
+               commonName                = takserver.work
+           X509v3 extensions:
+               X509v3 Key Usage: critical
+                   Digital Signature, Key Encipherment
+               X509v3 Extended Key Usage:
+                   TLS Web Server Authentication, TLS Web Client Authentication
+               X509v3 CRL Distribution Points:
+   
+                   Full Name:
+                     URI:http://takserver.work/SCA01crl.crl
+   
+               Authority Information Access:
+                   CA Issuers - URI:http://takserver.work/SCA01.crt
+   
+               X509v3 Subject Alternative Name:
+                   DNS:takserver.work
+               X509v3 Certificate Policies:
+                   Policy: 2.23.140.1.2.2
+   
+               Netscape Comment:
+                   OpenSSL Generated Certificate
+               X509v3 Subject Key Identifier:
+                   33:B6:8E:B6:8E:5B:1E:CC:EE:6F:26:82:E8:27:A3:0D:16:A5:A5:84
+               X509v3 Authority Key Identifier:
+                   keyid:FA:21:76:E3:94:69:7A:69:4F:D3:55:66:9E:FF:80:35:E2:54:4A:57
+   
+   Certificate is to be certified until Apr 21 12:33:22 2026 GMT (1825 days)
+   
+   Write out database with 1 new entries
+   Data Base Updated
+
+6. エンドエンティティ証明書を失効させる
+
+   1. 失効リスト確認
+   # openssl crl -in /etc/pki/takserver.work/RootCA/crl/PKI_Root_CA.crl -text -noout
+
+   2. 証明書を失効させる
+   # openssl ca -config /etc/pki/takserver.work/openssl-EndEntity.cnf \
+   -batch -revoke /etc/pki/takserver.work/EndEntity/certs/EndEntity.crt \
+   -cert /etc/pki/takserver.work/RootCA/certs/PKI_Root_CA.crt \
+   -keyfile /etc/pki/takserver.work/RootCA/private/PKI_Root_CA.key \
+   -passin file:/etc/pki/takserver.work/RootCA/private/PKI_Root_CA.pass
+
+   3. CRL 作成
+   # openssl ca -config /etc/pki/takserver.work/openssl-RootCA.cnf -gencrl -crldays 10957 \
+   > -cert /etc/pki/takserver.work/RootCA/certs/PKI_Root_CA.crt \
+   > -keyfile /etc/pki/takserver.work/RootCA/private/PKI_Root_CA.key \
+   > -passin file:/etc/pki/takserver.work/RootCA/private/PKI_Root_CA.pass \
+   > -out /etc/pki/takserver.work/RootCA/crl/PKI_Root_CA.crl
+
+   4. 失効リスト確認
+   # openssl crl -in /etc/pki/takserver.work/RootCA/crl/PKI_Root_CA.crl -text -noout
+
+7. 接続確認
+
+   # curl https://takserver.work --cacert /etc/pki/takserver.work/RootCA/certs/PKI_Root_CA.crt
+   testtesttettshdkjtdcfgvhjkl@poiucxfcgtuyhijokpl@;[:
+
+8. クライアント証明書発行
